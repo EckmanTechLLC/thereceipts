@@ -1,0 +1,265 @@
+/* Claim card styles */
+
+.claim-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin: 0.5rem 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Header */
+.claim-card-header {
+  margin-bottom: 1rem;
+}
+
+.claim-text {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.claim-meta {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Badges */
+.verdict-badge,
+.confidence-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.verdict-badge {
+  color: white;
+}
+
+.verdict-true {
+  background-color: #10b981;
+}
+
+.verdict-misleading {
+  background-color: #f59e0b;
+}
+
+.verdict-false {
+  background-color: #ef4444;
+}
+
+.verdict-unfalsifiable {
+  background-color: #6b7280;
+}
+
+.verdict-depends-on-definitions {
+  background-color: #8b5cf6;
+}
+
+.confidence-badge {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.confidence-high {
+  border-color: #10b981;
+  color: #10b981;
+}
+
+.confidence-medium {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
+.confidence-low {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+/* Short answer */
+.claim-section {
+  margin: 1rem 0;
+}
+
+.short-answer {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.short-answer p {
+  margin: 0;
+}
+
+/* Show Your Work button */
+.show-work-container {
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.show-work-button {
+  padding: 0.5rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--accent-color);
+  background-color: transparent;
+  border: 2px solid var(--accent-color);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.show-work-button:hover {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+/* Expandable sections */
+.expandable {
+  border-top: 1px solid var(--border-color);
+  padding-top: 0.75rem;
+}
+
+.section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-family: inherit;
+  text-align: left;
+}
+
+.section-toggle:hover .section-title {
+  color: var(--accent-color);
+}
+
+.toggle-icon {
+  display: inline-block;
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+  color: var(--text-secondary);
+}
+
+.toggle-icon.expanded {
+  transform: rotate(90deg);
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.section-content {
+  margin: 0.5rem 0 0.5rem 1.5rem;
+  animation: slideDown 0.2s ease;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.section-content p {
+  margin: 0.5rem 0;
+}
+
+/* Sources list */
+.sources-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.source-item {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  background-color: var(--bg-secondary);
+  border-radius: 0.5rem;
+  border-left: 3px solid var(--accent-color);
+}
+
+.source-citation {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.source-link {
+  display: inline-block;
+  margin: 0.5rem 0;
+  color: var(--accent-color);
+  font-size: 0.875rem;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.source-link:hover {
+  text-decoration: underline;
+}
+
+.source-quote {
+  margin: 0.5rem 0 0 0;
+  padding-left: 1rem;
+  border-left: 2px solid var(--border-color);
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+/* Apologetics list */
+.apologetics-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.apologetics-item {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  background-color: var(--bg-secondary);
+  border-radius: 0.5rem;
+}
+
+.apologetics-item strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--text-primary);
+}
+
+.apologetics-item p {
+  margin: 0.25rem 0 0 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+/* Audit trail */
+.audit-json {
+  background-color: var(--bg-secondary);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}

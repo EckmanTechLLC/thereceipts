@@ -1,0 +1,8 @@
+- blogs and chat responses should include links to cited sources
+- future, we will need disclaimers 'n such on the site
+- when we get to the UI we need to stop and properly design it with my input and expectations
+- Chat mode tag, Ask → “Get Answers”, Not a brand.Not a promise.Just a mode label users instantly understand.
+    - How it appears in the UI, Ask (Get Answers), Read (Claim Cards), Audits (Genesis · Canon · Doctrine · Ethics · Institutions)
+- For blogs, we will need the ability to add specific icons/screenshots/images to the blog header/clickbait type of stuff
+- Abuse prevention, how to handle?
+- Not every chat session is a novel question or lookup, what if the user responds and asks a follow up questions?

@@ -1,0 +1,133 @@
+.pipeline-progress {
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 1.5rem;
+  background: var(--card-background, #ffffff);
+  margin: 1rem 0;
+}
+
+.pipeline-progress__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.pipeline-progress__header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.pipeline-progress__status {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #666);
+  font-weight: 500;
+}
+
+.pipeline-progress__status--running {
+  color: var(--color-running, #2563eb);
+}
+
+.pipeline-progress__status--completed {
+  color: var(--color-completed, #16a34a);
+}
+
+.pipeline-progress__error {
+  background: var(--error-background, #fef2f2);
+  color: var(--error-color, #dc2626);
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.pipeline-progress__agents {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.agent-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.agent-status--pending {
+  background: var(--status-pending-bg, #f9fafb);
+  opacity: 0.6;
+}
+
+.agent-status--running {
+  background: var(--status-running-bg, #eff6ff);
+  border: 1px solid var(--status-running-border, #3b82f6);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.agent-status--completed {
+  background: var(--status-completed-bg, #f0fdf4);
+  border: 1px solid var(--status-completed-border, #22c55e);
+}
+
+.agent-status--failed {
+  background: var(--status-failed-bg, #fef2f2);
+  border: 1px solid var(--status-failed-border, #ef4444);
+}
+
+.agent-status__icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.agent-status__info {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.agent-status__name {
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+
+.agent-status__duration {
+  font-size: 0.875rem;
+  color: var(--text-secondary, #666);
+  font-weight: 500;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .pipeline-progress {
+    --card-background: #1f2937;
+    --border-color: #374151;
+    --text-secondary: #9ca3af;
+    --color-running: #60a5fa;
+    --color-completed: #4ade80;
+    --error-background: #7f1d1d;
+    --error-color: #fca5a5;
+    --status-pending-bg: #111827;
+    --status-running-bg: #1e3a8a;
+    --status-running-border: #3b82f6;
+    --status-completed-bg: #14532d;
+    --status-completed-border: #22c55e;
+    --status-failed-bg: #7f1d1d;
+    --status-failed-border: #ef4444;
+  }
+}
