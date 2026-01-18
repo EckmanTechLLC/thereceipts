@@ -227,6 +227,41 @@
   color: var(--text-secondary);
 }
 
+/* Verification status (Phase 4.1d) */
+.verification-badge {
+  display: inline-block;
+  margin-right: 0.5rem;
+  font-size: 1rem;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.verification-badge.verification-verified {
+  color: #10b981;
+}
+
+.verification-badge.verification-partial {
+  color: #f59e0b;
+}
+
+.verification-badge.verification-unverified {
+  color: #ef4444;
+}
+
+.verification-badge.verification-unknown {
+  color: #6b7280;
+}
+
+.source-verification-info {
+  margin: 0.25rem 0 0.5rem 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.verification-method {
+  font-style: italic;
+}
+
 /* Apologetics list */
 .apologetics-list {
   list-style: none;

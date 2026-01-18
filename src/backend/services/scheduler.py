@@ -190,8 +190,9 @@ class SchedulerService:
                     print(f"Processing claim {i}/{len(component_claims)}: {claim_text[:80]}...")
 
                     # Check for existing claim card via semantic search
+                    # Exclude current blog's claim IDs to prevent intra-blog deduplication
                     existing_card = await self._find_existing_claim(
-                        claim_text, db_session
+                        claim_text, db_session, exclude_claim_ids=claim_card_ids
                     )
 
                     if existing_card:
@@ -278,7 +279,8 @@ class SchedulerService:
     async def _find_existing_claim(
         self,
         claim_text: str,
-        db_session: AsyncSession
+        db_session: AsyncSession,
+        exclude_claim_ids: Optional[List[UUID]] = None
     ) -> Optional[Any]:
         """
         Search for existing claim card via semantic search.
@@ -286,6 +288,8 @@ class SchedulerService:
         Args:
             claim_text: Component claim text to search for
             db_session: Database session
+            exclude_claim_ids: Optional list of claim IDs to exclude from search
+                               (prevents intra-blog deduplication)
 
         Returns:
             ClaimCard if found with similarity >= 0.92, else None
@@ -294,12 +298,13 @@ class SchedulerService:
             # Generate embedding for claim text
             embedding = await self.embedding_service.generate_embedding(claim_text)
 
-            # Semantic search
+            # Semantic search (excluding current blog's claims)
             claim_repo = ClaimCardRepository(db_session)
             results = await claim_repo.search_by_embedding(
                 embedding=embedding,
                 threshold=self.SEMANTIC_SIMILARITY_THRESHOLD,
-                limit=1
+                limit=1,
+                exclude_claim_ids=exclude_claim_ids
             )
 
             if results:

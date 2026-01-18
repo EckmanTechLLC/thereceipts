@@ -17,6 +17,9 @@ import type {
   BlogPost,
   AuditCardsResponse,
   ClaimCard,
+  PublicMetricsResponse,
+  SourcesResponse,
+  GraphResponse,
 } from '../types';
 
 class APIClient {
@@ -160,6 +163,34 @@ class APIClient {
 
   async getAuditCard(cardId: string): Promise<ClaimCard> {
     return this.request<ClaimCard>(`/api/audits/cards/${cardId}`);
+  }
+
+  // Public metrics (Home page)
+  async getPublicMetrics(): Promise<PublicMetricsResponse> {
+    return this.request<PublicMetricsResponse>('/api/public/metrics');
+  }
+
+  // Sources (Sources page)
+  async getSources(params?: {
+    skip?: number;
+    limit?: number;
+    verification_status?: string;
+    source_type?: string;
+  }): Promise<SourcesResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.skip !== undefined) searchParams.append('skip', params.skip.toString());
+    if (params?.limit !== undefined) searchParams.append('limit', params.limit.toString());
+    if (params?.verification_status) searchParams.append('verification_status', params.verification_status);
+    if (params?.source_type) searchParams.append('source_type', params.source_type);
+
+    const query = searchParams.toString();
+    const endpoint = query ? `/api/public/sources?${query}` : '/api/public/sources';
+    return this.request<SourcesResponse>(endpoint);
+  }
+
+  // Knowledge graph (Graph page)
+  async getGraph(): Promise<GraphResponse> {
+    return this.request<GraphResponse>('/api/public/graph');
   }
 }
 

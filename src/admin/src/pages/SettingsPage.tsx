@@ -29,6 +29,17 @@ export function SettingsPage() {
   const [similarityThreshold, setSimilarityThreshold] = useState(0.85);
   const [isUpdatingAutoSuggest, setIsUpdatingAutoSuggest] = useState(false);
 
+  // Manual extraction form
+  const [sourceText, setSourceText] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [sourceName, setSourceName] = useState('');
+  const [isExtracting, setIsExtracting] = useState(false);
+
+  // Database reset
+  const [showResetConfirmation, setShowResetConfirmation] = useState(false);
+  const [resetConfirmationText, setResetConfirmationText] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
+
   useEffect(() => {
     loadSettings();
   }, []);
@@ -119,17 +130,85 @@ export function SettingsPage() {
     }
   };
 
-  const handleTriggerAutoSuggest = async () => {
-    if (!confirm('Trigger auto-suggest now? This will search for new topics.')) return;
+  const handleDiscoverTopics = async () => {
+    if (!confirm('Discover topics now? This will search the web for recent apologetics content.')) return;
 
     try {
       setError(null);
-      await api.triggerAutoSuggest();
-      alert('Auto-suggest started successfully');
+      setSuccessMessage(null);
+      const result = await api.discoverTopics();
+      setSuccessMessage(result.message || 'Topics discovered successfully');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to trigger auto-suggest';
+      const message = err instanceof Error ? err.message : 'Failed to discover topics';
       setError(message);
     }
+  };
+
+  const handleExtractTopics = async () => {
+    if (!sourceText.trim()) {
+      setError('Source text is required');
+      return;
+    }
+
+    try {
+      setIsExtracting(true);
+      setError(null);
+      setSuccessMessage(null);
+
+      const result = await api.triggerAutoSuggest(
+        sourceText,
+        sourceUrl || undefined,
+        sourceName || undefined
+      );
+
+      setSuccessMessage(result.message || 'Topics extracted successfully');
+
+      // Clear form on success
+      setSourceText('');
+      setSourceUrl('');
+      setSourceName('');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to extract topics';
+      setError(message);
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const handleResetDatabase = async () => {
+    if (resetConfirmationText !== 'RESET') {
+      setError('Please type "RESET" to confirm');
+      return;
+    }
+
+    try {
+      setIsResetting(true);
+      setError(null);
+      setSuccessMessage(null);
+
+      const result = await api.resetDatabase(true);
+
+      setSuccessMessage(
+        `Database reset successfully. Deleted: ${result.deleted.claim_cards} claims, ` +
+        `${result.deleted.blog_posts} blog posts, ${result.deleted.topics} topics, ` +
+        `${result.deleted.router_decisions} router decisions.`
+      );
+
+      // Close modal and reset form
+      setShowResetConfirmation(false);
+      setResetConfirmationText('');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to reset database';
+      setError(message);
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleCancelReset = () => {
+    setShowResetConfirmation(false);
+    setResetConfirmationText('');
+    setError(null);
   };
 
   if (loading) {
@@ -226,8 +305,8 @@ export function SettingsPage() {
       <div className="settings-section">
         <div className="section-header">
           <h2>Auto-Suggest Configuration</h2>
-          <button onClick={handleTriggerAutoSuggest} className="btn-secondary">
-            Trigger Now
+          <button onClick={handleDiscoverTopics} className="btn-secondary">
+            Discover Topics
           </button>
         </div>
 
@@ -284,7 +363,169 @@ export function SettingsPage() {
             {isUpdatingAutoSuggest ? 'Updating...' : 'Update Auto-Suggest Settings'}
           </button>
         </form>
+
+        {/* Manual Topic Extraction */}
+        <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid #ddd' }}>
+          <h3 style={{ marginBottom: '1rem' }}>Extract Topics from Text</h3>
+          <p style={{ marginBottom: '1rem', color: '#666' }}>
+            Paste apologetics content below to extract topics manually (for testing or specific sources).
+          </p>
+
+          <div className="form-group">
+            <label>Source Text (required):</label>
+            <textarea
+              value={sourceText}
+              onChange={(e) => setSourceText(e.target.value)}
+              placeholder="Paste apologetics content here (articles, blog posts, etc.)"
+              rows={8}
+              style={{ width: '100%', padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.9rem' }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Source URL (optional):</label>
+            <input
+              type="text"
+              value={sourceUrl}
+              onChange={(e) => setSourceUrl(e.target.value)}
+              placeholder="https://example.com/article"
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Source Name (optional):</label>
+            <input
+              type="text"
+              value={sourceName}
+              onChange={(e) => setSourceName(e.target.value)}
+              placeholder="Answers in Genesis"
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <button
+            onClick={handleExtractTopics}
+            disabled={isExtracting || !sourceText.trim()}
+            className="btn-primary"
+          >
+            {isExtracting ? 'Extracting...' : 'Extract Topics'}
+          </button>
+        </div>
       </div>
+
+      {/* Danger Zone */}
+      <div className="settings-section danger-zone">
+        <div className="section-header">
+          <h2>Danger Zone</h2>
+        </div>
+
+        <div className="danger-zone-content">
+          <div className="warning-box">
+            <h3>Clear Database</h3>
+            <p>
+              This will permanently delete all generated content while preserving system configuration.
+            </p>
+            <p><strong>Deleted:</strong></p>
+            <ul>
+              <li>All claim cards (and their sources, tags)</li>
+              <li>All blog posts</li>
+              <li>All topics in queue</li>
+              <li>All router decisions</li>
+            </ul>
+            <p><strong>Preserved:</strong></p>
+            <ul>
+              <li>Agent prompts and configurations</li>
+              <li>Verified sources library</li>
+            </ul>
+            <p style={{ color: '#d73a49', fontWeight: 'bold', marginTop: '1rem' }}>
+              This action cannot be undone.
+            </p>
+          </div>
+
+          <button
+            onClick={() => setShowResetConfirmation(true)}
+            className="btn-danger"
+            style={{
+              backgroundColor: '#d73a49',
+              color: 'white',
+              padding: '0.75rem 1.5rem',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '1rem',
+              fontWeight: 'bold',
+            }}
+          >
+            Clear Database
+          </button>
+        </div>
+      </div>
+
+      {/* Reset Confirmation Modal */}
+      {showResetConfirmation && (
+        <div className="modal-overlay" onClick={handleCancelReset}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>Confirm Database Reset</h2>
+            <p>
+              You are about to permanently delete all generated content.
+              This action <strong>cannot be undone</strong>.
+            </p>
+            <p style={{ marginTop: '1rem' }}>
+              Type <strong>RESET</strong> to confirm:
+            </p>
+            <input
+              type="text"
+              value={resetConfirmationText}
+              onChange={(e) => setResetConfirmationText(e.target.value)}
+              placeholder="Type RESET"
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                marginTop: '0.5rem',
+                fontSize: '1rem',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+              }}
+              autoFocus
+            />
+            <div className="modal-actions" style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
+              <button
+                onClick={handleCancelReset}
+                className="btn-secondary"
+                disabled={isResetting}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetDatabase}
+                disabled={isResetting || resetConfirmationText !== 'RESET'}
+                style={{
+                  flex: 1,
+                  padding: '0.75rem',
+                  backgroundColor: resetConfirmationText === 'RESET' ? '#d73a49' : '#ccc',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: resetConfirmationText === 'RESET' ? 'pointer' : 'not-allowed',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                }}
+              >
+                {isResetting ? 'Resetting...' : 'Reset Database'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

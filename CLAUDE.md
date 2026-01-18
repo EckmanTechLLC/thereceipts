@@ -1,7 +1,6 @@
 # TheReceipts Context for Claude
 
-**Last Updated:** 2026-01-16
-**Current Phase:** Phase 3 Complete (Auto-Blog), Phase 4 Defined (Admin Enhancements)
+**Purpose:** Development guide and rules for Claude implementation sessions.
 
 ---
 
@@ -26,63 +25,6 @@
 - Ask before expanding scope - stay within defined task
 - Document as you go - ADRs for decisions, session notes for progress
 - Show, don't just talk about it
-
----
-
-## Current Status
-
-### Initial Setup (COMPLETE ✓)
-- [x] Project directory created
-- [x] Documentation structure established
-- [x] Workflow documentation copied
-- [x] Project description and goals defined
-- [x] Core architecture decisions (ADR 001)
-
-### Phase 1: Foundation (COMPLETE ✓)
-- [x] 1.1: Database setup (thereceipts_dev, schema, pgvector, migrations)
-- [x] 1.2: FastAPI scaffold (main.py, session, repositories, category_tags, agent seed)
-- [x] 1.3: React frontend scaffold (Vite, Router, TopNav, 3 pages, theme toggle, API client)
-- [x] 1.4: Agent pipeline structure (5 agent classes, orchestrator)
-- [x] 1.5: WebSocket infrastructure (real-time progress updates)
-
-### Phase 2: Conversational Chat (COMPLETE ✓)
-- [x] 2.1: Context Analyzer + Semantic Search (embeddings, pgvector, reformulation)
-- [x] 2.2: Chat backend integration (conversation context, response formatting)
-- [x] 2.3: Chat UI (message thread, claim cards in chat, expandable sections)
-- [x] 2.4: Integration & polish (end-to-end flow, error handling)
-- [x] 2.5: Testing & bug fixes (2026-01-13 to 2026-01-14):
-  - Show Your Work UI behavior (subsections hidden by default)
-  - Source URL hallucination (removed coercive prompt language)
-  - Pipeline progress visibility (WebSocket event handling)
-  - Claim card header clarity (added "Claim:" label)
-  - Writing agent phantom quotes (prompt fix)
-  - Semantic search threshold tuning (0.85 → 0.92)
-  - Context analyzer alternative explanation handling
-- [x] 2.6: Intelligent Routing (2026-01-14 to 2026-01-16):
-  - Router Agent foundation (tool calling, router_decisions table, ADR 002)
-  - Tool implementation (search_existing_claims, get_claim_details, generate_new_claim)
-  - API integration (POST /api/chat/ask, mode-specific handlers, WebSocket events)
-  - Frontend updates (contextual response UI, source cards, markdown rendering)
-  - Bug fixes: Router Agent system prompt loading, context preservation, mode detection
-
-### Phase 3: Auto-Blog (COMPLETE ✓)
-- [x] 3.1: Database & Topic Queue (topic_queue, blog_posts tables, admin API)
-- [x] 3.2: Decomposer & Blog Composer agents (2 new agents, prompts)
-- [x] 3.3: Scheduler & Auto-Suggest (APScheduler, full generation flow, topic discovery)
-- [x] 3.4: Review Workflow Backend (approve/reject/revision logic, selective re-run)
-- [x] 3.5: Read & Audits Backend (public endpoints for published blog posts and visible claim cards)
-- [x] 3.6: Admin UI (standalone application on port 5174, topic queue, review interface, settings)
-- [x] 3.7: Read & Audits UI (public-facing blog articles and claim card repository)
-
-### Phase 4: Source Verification & Admin Enhancements (NOT STARTED)
-- [ ] 4.1: Multi-Source Verification (6-tier API integration for verified citations/quotes - ADR 004)
-  - [ ] 4.1a: Core API Integration + Library (Google Books, Semantic Scholar, Tavily, verified_sources table)
-  - [ ] 4.1b: Adversarial Re-Verification
-  - [ ] 4.1c: Ancient Texts Integration (CCEL, Perseus, Early Church Texts)
-  - [ ] 4.1d: UI Transparency (verification status display)
-- [ ] 4.2: Agent Prompt Editor (UI for editing system prompts, LLM config per agent)
-- [ ] 4.3: Bulk Topic Import (CSV/JSON bulk upload for topic queue)
-- [ ] 4.4: Database Reset Feature (admin UI to clear test data, preserve config + verified sources library)
 
 ---
 
@@ -177,18 +119,3 @@
 3. Confirm scope before starting
 4. Work incrementally
 5. Update session file in `/docs/sessions/` as you go
-
----
-
-## Known Issues
-
-### None Currently
-
-All critical bugs from Phase 2 have been resolved (as of 2026-01-16):
-- ✓ Router Agent now loads system prompt and routes correctly
-- ✓ Context Analyzer preserves assistant responses for follow-up questions
-- ✓ Mode 1 (EXACT_MATCH) triggers for similar questions (similarity >= 0.92)
-- ✓ Mode 2 (CONTEXTUAL) renders markdown and displays full source cards
-- ✓ Semantic search limitations addressed via LLM-based Router Agent with tool calling (Phase 2.6)
-
-See `/docs/sessions/2026-01-15-routing-bugs-fix.md` for details.

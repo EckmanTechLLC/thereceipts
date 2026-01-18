@@ -20,7 +20,9 @@ Future enhancements:
 import json
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
+from tavily import TavilyClient
 
+from config import settings
 from database.session import AsyncSessionFactory
 from database.repositories import TopicQueueRepository, ClaimCardRepository
 from database.models import TopicQueue, TopicStatusEnum
@@ -95,6 +97,7 @@ Priority scoring guidelines:
         self.config = AutoSuggestConfig()
         self.llm_client = LLMClient()
         self.embedding_service = EmbeddingService()
+        self.tavily_client = TavilyClient(api_key=settings.TAVILY_API_KEY) if settings.TAVILY_API_KEY else None
 
     def configure(self, config: AutoSuggestConfig):
         """
@@ -142,26 +145,37 @@ Output JSON only, no other text.
 """
 
             # Call LLM with extraction prompt
-            response = await self.llm_client.call_llm(
+            response = await self.llm_client.call(
+                provider="anthropic",
+                model_name="claude-3-5-haiku-20241022",  # Fast, cost-effective
                 system_prompt=self.EXTRACTION_PROMPT,
                 user_message=user_message,
-                model="claude-haiku-3-5-20250116",  # Fast, cost-effective
                 temperature=0.7,
                 max_tokens=2048
             )
 
             content = response["content"]
 
-            # Parse JSON response
+            # Parse JSON response - extract JSON object robustly
             if "```json" in content:
                 # Extract from markdown code block
                 start = content.index("```json") + 7
                 end = content.rindex("```")
                 json_str = content[start:end].strip()
             else:
+                # Find first '{' and last '}' to extract JSON object
                 json_str = content.strip()
+                if "{" in json_str and "}" in json_str:
+                    start = json_str.index("{")
+                    end = json_str.rindex("}") + 1
+                    json_str = json_str[start:end]
 
-            parsed = json.loads(json_str)
+            try:
+                parsed = json.loads(json_str)
+            except json.JSONDecodeError as e:
+                # Log the problematic content for debugging
+                print(f"[AUTOSUGGEST] Failed to parse JSON. Content: {content[:500]}")
+                raise AutoSuggestServiceError(f"Failed to parse LLM JSON output: {str(e)}")
 
             if "topics" not in parsed or not isinstance(parsed["topics"], list):
                 raise AutoSuggestServiceError("Invalid LLM response format")
@@ -179,8 +193,9 @@ Output JSON only, no other text.
 
             return topics
 
-        except json.JSONDecodeError as e:
-            raise AutoSuggestServiceError(f"Failed to parse LLM JSON output: {str(e)}")
+        except AutoSuggestServiceError:
+            # Re-raise our own errors
+            raise
         except Exception as e:
             raise AutoSuggestServiceError(f"Topic extraction failed: {str(e)}")
 
@@ -239,23 +254,19 @@ Output JSON only, no other text.
                     # Clamp priority to 1-10
                     priority = max(1, min(10, priority))
 
-                    # Build context string
-                    context_parts = []
-                    if topic_data.get("reasoning"):
-                        context_parts.append(f"Reasoning: {topic_data['reasoning']}")
-                    if topic_data.get("source_name"):
-                        context_parts.append(f"Source: {topic_data['source_name']}")
-                    if topic_data.get("source_url"):
-                        context_parts.append(f"URL: {topic_data['source_url']}")
-
-                    context = "\n".join(context_parts) if context_parts else None
+                    # Build source string (where this topic came from)
+                    source_name = topic_data.get("source_name", "auto-suggest")
+                    if source_name and source_name != "auto-suggest":
+                        source = f"auto-suggest: {source_name[:100]}"
+                    else:
+                        source = "auto-suggest"
 
                     # Create topic queue entry
                     new_topic = TopicQueue(
                         topic_text=topic_text,
                         priority=priority,
                         status=TopicStatusEnum.QUEUED,
-                        context=context
+                        source=source
                     )
 
                     await topic_repo.create(new_topic)
@@ -315,6 +326,100 @@ Output JSON only, no other text.
             print(f"  → Embedding generation failed during dedup check: {str(e)}")
             # If embedding fails, treat as not duplicate (fail-open)
             return False
+
+    async def discover_topics_from_web(self) -> Dict[str, Any]:
+        """
+        Automatically discover topics from web sources using Tavily search.
+
+        Searches for recent Christian apologetics content and extracts topics.
+
+        Returns:
+            Dict with summary:
+                - extracted: Number of topics extracted from search results
+                - added: Number of topics added to queue
+                - skipped_duplicates: Number skipped due to existing similar claims
+                - failed: Number that failed to add
+                - sources_searched: Number of web sources searched
+
+        Raises:
+            AutoSuggestServiceError: If discovery fails or Tavily not configured
+        """
+        if not self.tavily_client:
+            raise AutoSuggestServiceError(
+                "Tavily API key not configured. Set TAVILY_API_KEY environment variable."
+            )
+
+        try:
+            # Search queries targeting apologetics content
+            search_queries = [
+                "Christian apologetics recent claims 2026",
+                "answers in genesis recent articles",
+                "William Lane Craig recent apologetics"
+            ]
+
+            all_topics = []
+            sources_searched = 0
+
+            for query in search_queries:
+                try:
+                    print(f"Searching: {query}")
+                    # Search with Tavily
+                    response = self.tavily_client.search(
+                        query=query,
+                        max_results=3,
+                        search_depth="basic"
+                    )
+
+                    if not response or "results" not in response:
+                        continue
+
+                    # Extract topics from each search result
+                    for result in response["results"]:
+                        sources_searched += 1
+                        content = result.get("content", "")
+                        url = result.get("url", "")
+                        title = result.get("title", "")
+
+                        if not content:
+                            continue
+
+                        print(f"  → Extracting from: {title[:60]}...")
+
+                        # Extract topics from this source
+                        topics = await self.extract_topics_from_text(
+                            source_text=content,
+                            source_url=url,
+                            source_name=title
+                        )
+
+                        all_topics.extend(topics)
+
+                except Exception as e:
+                    print(f"  → Search failed for '{query}': {str(e)}")
+                    continue
+
+            if not all_topics:
+                return {
+                    "extracted": 0,
+                    "added": 0,
+                    "skipped_duplicates": 0,
+                    "failed": 0,
+                    "sources_searched": sources_searched
+                }
+
+            # Add discovered topics to queue
+            result = await self.add_topics_to_queue(all_topics)
+
+            return {
+                "extracted": len(all_topics),
+                "added": result["added"],
+                "skipped_duplicates": result["skipped_duplicates"],
+                "failed": result["failed"],
+                "sources_searched": sources_searched
+            }
+
+        except Exception as e:
+            raise AutoSuggestServiceError(f"Web discovery failed: {str(e)}")
 
 
 # Global auto-suggest service instance

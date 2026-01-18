@@ -16,6 +16,12 @@ export function TopNav() {
         </div>
         <div className="nav-links">
           <Link
+            to="/"
+            className={isActive('/') ? 'active' : ''}
+          >
+            Home
+          </Link>
+          <Link
             to="/ask"
             className={isActive('/ask') ? 'active' : ''}
           >
@@ -33,6 +39,20 @@ export function TopNav() {
           >
             Audits
           </Link>
+          <Link
+            to="/sources"
+            className={isActive('/sources') ? 'active' : ''}
+          >
+            Sources
+          </Link>
+          {/* Graph link hidden - feature in progress
+          <Link
+            to="/graph"
+            className={isActive('/graph') ? 'active' : ''}
+          >
+            Graph
+          </Link>
+          */}
         </div>
         <button
           className="theme-toggle"

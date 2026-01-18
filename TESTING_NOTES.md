@@ -189,3 +189,30 @@ Then body says "This claim is false" - contradictory appearance.
 3. Novel claim → Full pipeline (~45-60s)
 
 **Decision needed:** How to detect mode 2 vs mode 3? Context Analyzer enhancement?
+
+---
+
+# Testing Notes - Phase 4.1b
+
+**Date:** 2026-01-18
+**Component:** Adversarial Re-Verification
+
+## Known Limitations
+
+### 1. Search query parsing is heuristic
+**Location:** `src/backend/agents/adversarial_checker.py` line 197
+
+**Issue:** Creates search query by taking text before first comma in citation.
+
+**Impact:** May produce suboptimal search queries for complex citations.
+
+**Status:** Adequate for Phase 4.1b scope. Consider enhanced parsing in future.
+
+### 2. Source type inference is keyword-based
+**Location:** `src/backend/agents/adversarial_checker.py` lines 200-202
+
+**Issue:** Infers "book" vs "scholarly" by searching for keywords ("press", "publisher", "edition").
+
+**Impact:** May misclassify some sources, affecting which API tier is tried first.
+
+**Status:** Adequate for Phase 4.1b scope. Multi-tier fallback mitigates misclassification.

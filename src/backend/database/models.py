@@ -130,6 +130,7 @@ class Source(Base):
     Sources supporting claim card verdicts.
 
     Separated by type: primary historical sources vs scholarly peer-reviewed sources.
+    Phase 4.1: Added verification metadata for API-verified sources.
     """
     __tablename__ = "sources"
 
@@ -142,6 +143,12 @@ class Source(Base):
     quote_text = Column(Text, nullable=True)  # Relevant quote from source
     usage_context = Column(Text, nullable=True)  # How this source is used in the analysis
 
+    # Phase 4.1: Verification metadata
+    verification_method = Column(String(50), nullable=True)  # google_books, semantic_scholar, tavily, llm_unverified
+    verification_status = Column(String(50), nullable=True)  # verified, partially_verified, unverified
+    content_type = Column(String(50), nullable=True)  # exact_quote, verified_paraphrase, unverified_content
+    url_verified = Column(Boolean, default=False, nullable=False)  # URL tested and working
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Relationships
@@ -150,6 +157,54 @@ class Source(Base):
     __table_args__ = (
         Index('ix_sources_claim_card_id', 'claim_card_id'),
         Index('ix_sources_source_type', 'source_type'),
+        Index('ix_sources_verification_method', 'verification_method'),
+        Index('ix_sources_verification_status', 'verification_status'),
+    )
+
+
+class VerifiedSource(Base):
+    """
+    Verified Source Library (Tier 0) for reusable source metadata.
+
+    Phase 4.1: Library of API-verified sources (books, papers, ancient texts).
+    Stores book/paper metadata with embeddings for semantic search.
+    Reuses verified metadata across claim cards, but quotes are claim-specific.
+    """
+    __tablename__ = "verified_sources"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Source identification
+    source_type = Column(String(50), nullable=False)  # book, paper, ancient_text
+    title = Column(String(1000), nullable=False)
+    author = Column(String(500), nullable=False)
+
+    # Publication metadata
+    publisher = Column(String(500), nullable=True)
+    publication_date = Column(String(100), nullable=True)
+    isbn = Column(String(50), nullable=True)
+    doi = Column(String(200), nullable=True)
+
+    # Verification data
+    url = Column(Text, nullable=False)  # Verified working URL
+    content_snippet = Column(Text, nullable=True)  # Sample content from source
+    topic_keywords = Column(ARRAY(String), nullable=True)  # Keywords for semantic search
+
+    # Semantic search embedding (1536 dimensions for OpenAI ada-002)
+    embedding = Column(Vector(1536), nullable=True)
+
+    # Verification metadata
+    verification_method = Column(String(50), nullable=False)  # google_books, semantic_scholar, ccel, perseus, tavily
+    verification_status = Column(String(50), nullable=False)  # verified, partially_verified
+
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        Index('ix_verified_sources_source_type', 'source_type'),
+        Index('ix_verified_sources_title', 'title'),
+        Index('ix_verified_sources_author', 'author'),
     )
 
 

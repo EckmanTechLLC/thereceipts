@@ -75,6 +75,44 @@ export function ClaimCard({ card }: ClaimCardProps) {
     );
   };
 
+  // Helper to map verification_method to user-friendly label
+  const getVerificationLabel = (method: string | null | undefined): string => {
+    if (!method) return 'Unknown';
+
+    const labels: Record<string, string> = {
+      'library_reuse': 'Library Reuse',
+      'google_books': 'Google Books',
+      'semantic_scholar': 'Semantic Scholar',
+      'arxiv': 'arXiv',
+      'pubmed': 'PubMed',
+      'ccel': 'CCEL',
+      'perseus': 'Perseus Digital Library',
+      'early_church_texts': 'Early Church Texts',
+      'tavily': 'Web Source',
+      'llm_unverified': 'AI Training Data'
+    };
+
+    return labels[method] || method;
+  };
+
+  // Helper to render verification badge based on status
+  const renderVerificationBadge = (status: string | null | undefined) => {
+    if (!status) {
+      return <span className="verification-badge verification-unknown" title="Verification status unknown">ⓘ</span>;
+    }
+
+    switch (status) {
+      case 'verified':
+        return <span className="verification-badge verification-verified" title="Verified from source">✓</span>;
+      case 'partially_verified':
+        return <span className="verification-badge verification-partial" title="Partially verified">ⓘ</span>;
+      case 'unverified':
+        return <span className="verification-badge verification-unverified" title="Unverified">⚠</span>;
+      default:
+        return <span className="verification-badge verification-unknown" title="Verification status unknown">ⓘ</span>;
+    }
+  };
+
   return (
     <div className="claim-card">
       {/* Header */}
@@ -180,7 +218,16 @@ export function ClaimCard({ card }: ClaimCardProps) {
               <ul className="sources-list">
                 {card.sources.map(source => (
                   <li key={source.id} className="source-item">
-                    <div className="source-citation">{source.citation}</div>
+                    <div className="source-citation">
+                      {renderVerificationBadge(source.verification_status)} {source.citation}
+                    </div>
+                    {source.verification_method && (
+                      <div className="source-verification-info">
+                        <span className="verification-method">
+                          {getVerificationLabel(source.verification_method)}
+                        </span>
+                      </div>
+                    )}
                     {source.url && (
                       <a
                         href={source.url}

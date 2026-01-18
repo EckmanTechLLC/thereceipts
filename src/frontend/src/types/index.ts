@@ -18,6 +18,25 @@ export interface Source {
   url: string | null;
   quote_text: string | null;
   usage_context: string | null;
+  // Phase 4.1: Source verification metadata
+  verification_method?: string | null;
+  verification_status?: 'verified' | 'partially_verified' | 'unverified' | null;
+  content_type?: 'exact_quote' | 'verified_paraphrase' | 'unverified_content' | null;
+  url_verified?: boolean | null;
+}
+
+// Source with usage count (for Sources page)
+export interface SourceWithCount {
+  id: string;
+  citation: string;
+  source_type: SourceType;
+  url: string | null;
+  verification_method: string | null;
+  verification_status: 'verified' | 'partially_verified' | 'unverified' | null;
+  content_type: 'exact_quote' | 'verified_paraphrase' | 'unverified_content' | null;
+  url_verified: boolean;
+  usage_count: number;
+  created_at: string; // ISO timestamp
 }
 
 // Apologetics tag entity
@@ -181,4 +200,44 @@ export interface AuditCardsResponse {
   claim_cards: ClaimCard[];
   total: number;
   has_more: boolean;
+}
+
+// Public metrics response (GET /api/public/metrics)
+export interface PublicMetricsResponse {
+  claim_count: number;
+  blog_count: number;
+  question_count: number;
+}
+
+// Sources API response (GET /api/public/sources)
+export interface SourcesResponse {
+  sources: SourceWithCount[];
+  pagination: {
+    skip: number;
+    limit: number;
+    count: number;
+  };
+}
+
+// Knowledge graph types (GET /api/public/graph)
+export type GraphNodeType = 'blog' | 'claim' | 'source';
+export type GraphEdgeType = 'HAS_CLAIM' | 'USES_SOURCE';
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  type: GraphNodeType;
+  metadata: Record<string, unknown>;
+}
+
+export interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  type: GraphEdgeType;
+}
+
+export interface GraphResponse {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
 }

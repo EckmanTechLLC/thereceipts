@@ -10,9 +10,9 @@ The system audits claims, not beliefs.
 
 ## Status
 
-**Version:** 0.3.0 - Phase 3 (Auto-Blog) Complete
+**Version:** 0.5.0 - Phase 4 Complete (Multi-Source Verification + Admin Enhancements)
 **Started:** 2026-01-12
-**Current Phase:** Testing Phase 3, Planning Phase 4 (Admin Enhancements)
+**Current Phase:** Production-Ready, Deployment Planning
 
 ---
 
@@ -29,13 +29,24 @@ The system audits claims, not beliefs.
 
 ## Core Capabilities
 
-1. **Chat Mode** - Ask any question, get audited answers
-2. **Blog Mode** - Curated feed of auto-generated claim analyses
-3. **Multi-Agent Pipeline** - 5 sequential agents verify every claim
-4. **Semantic Search** - Reuse audited claims for instant responses
-5. **Auto-Blog** - Scheduled claim generation with admin review
-6. **Auto-Suggest** - LLM + web search discovers new apologetics claims
-7. **Admin Portal** - Manage queue, edit prompts, review failures
+### Public Features
+1. **Home Page** - System introduction with live metrics and disclaimers
+2. **Chat Mode** - Ask any question, get audited answers with intelligent routing
+3. **Blog Mode** - Curated feed of auto-generated claim analyses
+4. **Audit Repository** - Browse all verified claim cards by category
+5. **Sources Page** - Explore all sources sorted by reference count with verification status
+
+### Pipeline Features
+6. **Multi-Agent Pipeline** - 5 sequential agents verify every claim
+7. **Source Verification** - 6-tier API system verifies citations against real sources (Google Books, Semantic Scholar, CCEL, Perseus, Tavily)
+8. **Semantic Search** - Reuse audited claims for instant responses
+9. **Intelligent Router** - 3 response modes (exact match, contextual, novel generation)
+
+### Admin Features
+10. **Auto-Blog** - Scheduled claim generation with admin review
+11. **Auto-Suggest** - Automatic web discovery of new apologetics claims via Tavily
+12. **Admin Portal** - Manage queue, review failures, approve content
+13. **Database Reset** - Clear test data while preserving configuration and verified sources
 
 ---
 
@@ -49,8 +60,8 @@ The system audits claims, not beliefs.
 
 **5-Agent Pipeline:**
 1. Topic Finder - Identifies claim + claimant + context
-2. Source Checker - Gathers primary historical + scholarly sources
-3. Adversarial Checker - Attempts to falsify, verifies quotes
+2. Source Checker - Verifies sources via 6-tier API system (Google Books, Semantic Scholar, CCEL, Perseus, Tavily)
+3. Adversarial Checker - Attempts to falsify, re-verifies quotes against actual sources
 4. Writing Agent - Produces forensic, accessible prose
 5. Publisher - Adds audit summary + limitations + what would change verdict
 
@@ -132,18 +143,44 @@ Sequential agent pipeline with transparent audit trails. Chat mode uses semantic
 - [x] Decomposer and Blog Composer agents
 - [x] Admin UI (standalone application on port 5174)
 
-### Phase 4: Source Verification & Admin Enhancements (NOT STARTED)
-- [ ] Multi-source verification (6-tier API integration)
-  - [ ] Verified source library (Tier 0: reuse verified book metadata with fresh quotes)
-  - [ ] Google Books API (books with page-verified snippets)
-  - [ ] Semantic Scholar/arXiv/PubMed APIs (academic papers)
-  - [ ] CCEL/Perseus/Early Church Texts (ancient texts)
-  - [ ] Tavily API (web sources, URL verification)
-  - [ ] Adversarial Checker re-verification with actual sources
-  - [ ] UI transparency for verification status
-- [ ] Agent prompt editor (edit system prompts and LLM config per agent)
-- [ ] Bulk topic import (CSV/JSON upload)
-- [ ] Database reset feature (clear test data, preserve config + verified sources)
+### Phase 4.1: Multi-Source Verification (COMPLETE ✓)
+- [x] 4.1a: Core API Integration + Verified Source Library
+  - [x] Tier 0: Verified source library (semantic search + LLM relevance check)
+  - [x] Tier 1: Google Books API integration
+  - [x] Tier 2: Semantic Scholar API integration
+  - [x] Tier 4: Tavily API integration (web sources)
+  - [x] Tier 5: LLM fallback with transparency
+  - [x] Database migration (verified_sources table + source verification columns)
+  - [x] SourceVerificationService with 6-tier system
+- [x] 4.1b: Adversarial Re-Verification
+  - [x] Integrated verification service into Adversarial Checker
+  - [x] Quote comparison against actual API content
+  - [x] URL validation and discrepancy flagging
+  - [x] Reverification notes in agent_audit
+- [x] 4.1c: Ancient Texts Integration (Tier 3)
+  - [x] Perseus Digital Library integration
+  - [x] CCEL (Christian Classics Ethereal Library) integration
+  - [x] Ancient text sources added to verified source library
+- [x] 4.1d: UI Transparency
+  - [x] Verification badges in ClaimCard (✓/ⓘ/⚠)
+  - [x] Verification method labels for each source
+  - [x] Color-coded confidence indicators
+
+### Phase 4.2: UI Enhancements (COMPLETE ✓)
+- [x] Home page with metrics, disclaimers, and system introduction
+- [x] Sources page (all sources sorted by reference count with filters)
+- [x] Sticky navigation header (always visible during scroll)
+- [x] Knowledge graph visualization (ReactFlow-based, currently hidden)
+
+### Phase 4.3: Admin Enhancements (COMPLETE ✓)
+- [x] Database reset feature (clear test data, preserve config + verified sources)
+- [x] Auto-suggest web discovery (Tavily-based automatic topic discovery)
+- [x] Intra-blog deduplication fix (prevents claims within same blog from being skipped)
+
+### Future Enhancements (PLANNED)
+- [ ] Agent prompt editor (edit system prompts and LLM config per agent via UI)
+- [ ] Bulk topic import (CSV/JSON upload for topic queue)
+- [ ] Knowledge graph public access (enable graph navigation link)
 
 ---
 
@@ -177,8 +214,11 @@ Sequential agent pipeline with transparent audit trails. Chat mode uses semantic
 - Python 3.12+
 - Node.js 18+
 - PostgreSQL 15+ with pgvector extension
-- Anthropic API key
-- OpenAI API key
+- Anthropic API key (agent pipeline)
+- OpenAI API key (embeddings + source verification)
+- Google Books API key (source verification, optional)
+- Tavily API key (source verification, optional)
+- Semantic Scholar API key (source verification, optional)
 
 ### Backend Setup
 
@@ -200,6 +240,9 @@ Sequential agent pipeline with transparent audit trails. Chat mode uses semantic
    POSTGRES_PASSWORD=your_db_password
    ANTHROPIC_API_KEY=your_anthropic_key
    OPENAI_API_KEY=your_openai_key
+   GOOGLE_BOOKS_API_KEY=your_google_books_key  # Optional
+   TAVILY_API_KEY=your_tavily_key              # Optional
+   SEMANTIC_SCHOLAR_API_KEY=your_s2_key        # Optional
    ```
 
 4. **Run database migrations:**
@@ -230,26 +273,67 @@ Sequential agent pipeline with transparent audit trails. Chat mode uses semantic
    npm run dev -- --host 0.0.0.0
    ```
 
+### Admin UI Setup
+
+1. **Install dependencies:**
+   ```bash
+   cd src/admin
+   npm install
+   ```
+
+2. **Start admin development server:**
+   ```bash
+   npm run dev -- --host 0.0.0.0 --port 5174
+   ```
+
 ### Using the Application
 
-1. **Open browser:** Navigate to `http://localhost:5173` (or your network IP)
+**Public Frontend** (`http://localhost:5173`):
 
-2. **Ask page (Chat):**
+1. **Home Page:**
+   - System overview and introduction
+   - Live metrics (claims, blogs, questions answered)
+   - AI disclaimer and terms of service
+
+2. **Ask (Chat):**
    - Enter any question about Christian apologetics claims
    - Example: "Did Matthew write the Gospel of Matthew?"
-   - System will search existing claim cards or generate new analysis via 5-agent pipeline
+   - System routes intelligently (instant, contextual, or full pipeline)
    - Watch real-time progress as agents work
-   - Expand "Show Your Work" to see detailed evidence and sources
+   - Expand "Show Your Work" to see evidence and sources with verification badges
 
-3. **Keyboard shortcuts:**
-   - `Enter` - Send message
-   - `Esc` - Clear input or dismiss error
+3. **Read (Blog):**
+   - Browse published blog posts
+   - Synthesized articles covering multiple related claims
+   - Full source citations with verification status
 
-4. **Features:**
-   - Conversation context preserved across page refresh (until tab closes)
-   - Error handling with user-friendly messages
-   - Character count when approaching limit (2000 chars)
-   - Clear conversation button
+4. **Audits (Repository):**
+   - Browse all verified claim cards
+   - Filter by category, verdict, confidence
+   - Direct links to sources
+
+5. **Sources:**
+   - Explore all sources used across claims
+   - Sorted by reference count
+   - Filter by verification status and source type
+
+**Admin UI** (`http://localhost:5174`):
+
+1. **Topic Queue:**
+   - View queued topics with priority
+   - Trigger manual generation
+   - Clear queue
+
+2. **Review:**
+   - Approve/reject generated blog posts
+   - Request revisions (regenerate decomposer/pipeline/composer)
+   - Preview before publishing
+
+3. **Settings:**
+   - Configure auto-suggest and scheduler
+   - Trigger web discovery (finds new claims via Tavily)
+   - Extract topics from text manually
+   - Database reset (danger zone)
 
 ---
 
@@ -265,4 +349,4 @@ Sequential agent pipeline with transparent audit trails. Chat mode uses semantic
 
 ---
 
-**Last Updated:** 2026-01-13
+**Last Updated:** 2026-01-18

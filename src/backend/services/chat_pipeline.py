@@ -125,6 +125,11 @@ async def run_chat_pipeline(
                                 "url": s.url,
                                 "quote_text": s.quote_text,
                                 "usage_context": s.usage_context,
+                                # Phase 4.1: Verification metadata
+                                "verification_method": s.verification_method,
+                                "verification_status": s.verification_status,
+                                "content_type": s.content_type,
+                                "url_verified": s.url_verified,
                             }
                             for s in claim_card_full.sources
                         ],

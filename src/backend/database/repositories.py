@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from database.models import (
     ClaimCard, Source, ApologeticsTag, CategoryTag,
-    AgentPrompt, TopicQueue, TopicStatusEnum, BlogPost
+    AgentPrompt, TopicQueue, TopicStatusEnum, BlogPost, VerifiedSource
 )
 
 
@@ -161,7 +161,8 @@ class ClaimCardRepository:
         self,
         embedding: List[float],
         threshold: float = 0.85,
-        limit: int = 5
+        limit: int = 5,
+        exclude_claim_ids: Optional[List[UUID]] = None
     ) -> List[tuple[ClaimCard, float]]:
         """
         Search for similar claim cards using vector similarity.
@@ -173,6 +174,8 @@ class ClaimCardRepository:
             embedding: Query embedding vector (1536 dimensions)
             threshold: Minimum similarity threshold (0-1, default 0.85)
             limit: Maximum number of results to return
+            exclude_claim_ids: Optional list of claim IDs to exclude from results
+                               (useful for intra-blog deduplication)
 
         Returns:
             List of tuples: (ClaimCard, similarity_score)
@@ -185,28 +188,40 @@ class ClaimCardRepository:
         # Threshold of 0.85 similarity = 0.3 distance
         distance_threshold = (1 - threshold) * 2
 
+        # Build WHERE clause with optional exclusion
+        where_clauses = [
+            "c.embedding IS NOT NULL",
+            "(c.embedding <=> :query_embedding) <= :distance_threshold"
+        ]
+
+        params = {
+            "query_embedding": str(embedding),
+            "distance_threshold": distance_threshold,
+            "limit": limit
+        }
+
+        # Add exclusion filter if provided
+        if exclude_claim_ids:
+            # Convert UUIDs to strings for SQL array comparison
+            exclude_ids_str = [str(cid) for cid in exclude_claim_ids]
+            where_clauses.append("c.id::text != ALL(:exclude_ids)")
+            params["exclude_ids"] = exclude_ids_str
+
+        where_clause = " AND ".join(where_clauses)
+
         # Build query with pgvector operator
         # Note: <=> is cosine distance operator
-        query = text("""
+        query = text(f"""
             SELECT
                 c.*,
                 1 - (c.embedding <=> :query_embedding) / 2 as similarity
             FROM claim_cards c
-            WHERE
-                c.embedding IS NOT NULL
-                AND (c.embedding <=> :query_embedding) <= :distance_threshold
+            WHERE {where_clause}
             ORDER BY c.embedding <=> :query_embedding
             LIMIT :limit
         """)
 
-        result = await self.session.execute(
-            query,
-            {
-                "query_embedding": str(embedding),
-                "distance_threshold": distance_threshold,
-                "limit": limit
-            }
-        )
+        result = await self.session.execute(query, params)
 
         rows = result.fetchall()
 
@@ -332,6 +347,11 @@ class ClaimCardRepository:
                     url=source_data.get("url"),
                     quote_text=source_data.get("quote_text") or source_data.get("quote"),
                     usage_context=source_data.get("usage_context"),
+                    # Phase 4.1: Verification metadata
+                    verification_method=source_data.get("verification_method"),
+                    verification_status=source_data.get("verification_status"),
+                    content_type=source_data.get("content_type"),
+                    url_verified=source_data.get("url_verified", False),
                 )
                 self.session.add(source)
 
@@ -345,6 +365,11 @@ class ClaimCardRepository:
                     url=source_data.get("url"),
                     quote_text=source_data.get("quote_text") or source_data.get("quote"),
                     usage_context=source_data.get("usage_context"),
+                    # Phase 4.1: Verification metadata
+                    verification_method=source_data.get("verification_method"),
+                    verification_status=source_data.get("verification_status"),
+                    content_type=source_data.get("content_type"),
+                    url_verified=source_data.get("url_verified", False),
                 )
                 self.session.add(source)
 
@@ -677,3 +702,111 @@ class BlogPostRepository:
         await self.session.flush()
         await self.session.refresh(blog_post)
         return blog_post
+
+
+class VerifiedSourceRepository:
+    """Repository for VerifiedSource operations (Phase 4.1: Source Verification Library)."""
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def get_by_id(self, source_id: UUID) -> Optional[VerifiedSource]:
+        """Get a verified source by ID."""
+        result = await self.session.execute(
+            select(VerifiedSource).where(VerifiedSource.id == source_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def search_by_similarity(
+        self,
+        embedding: List[float],
+        similarity_threshold: float = 0.85,
+        limit: int = 5
+    ) -> List[tuple[VerifiedSource, float]]:
+        """
+        Search verified sources by semantic similarity to claim keywords.
+
+        Args:
+            embedding: Query embedding vector (1536 dimensions)
+            similarity_threshold: Minimum cosine similarity (default 0.85)
+            limit: Maximum number of results to return
+
+        Returns:
+            List of tuples (VerifiedSource, similarity_score) ordered by similarity desc
+        """
+        # Using pgvector cosine similarity operator <=>
+        # Note: <=> returns distance (0 = identical), so 1 - distance = similarity
+        query = select(
+            VerifiedSource,
+            (1 - VerifiedSource.embedding.cosine_distance(embedding)).label('similarity')
+        ).where(
+            (1 - VerifiedSource.embedding.cosine_distance(embedding)) >= similarity_threshold
+        ).order_by(
+            VerifiedSource.embedding.cosine_distance(embedding)
+        ).limit(limit)
+
+        result = await self.session.execute(query)
+        return [(row[0], row[1]) for row in result.all()]
+
+    async def find_by_title_author(
+        self,
+        title: str,
+        author: str
+    ) -> Optional[VerifiedSource]:
+        """
+        Find verified source by exact title and author match.
+
+        Args:
+            title: Source title
+            author: Source author
+
+        Returns:
+            VerifiedSource or None if not found
+        """
+        result = await self.session.execute(
+            select(VerifiedSource).where(
+                VerifiedSource.title == title,
+                VerifiedSource.author == author
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def create(self, verified_source: VerifiedSource) -> VerifiedSource:
+        """Create a new verified source."""
+        self.session.add(verified_source)
+        await self.session.flush()
+        await self.session.refresh(verified_source)
+        return verified_source
+
+    async def update(self, verified_source: VerifiedSource) -> VerifiedSource:
+        """Update an existing verified source."""
+        await self.session.flush()
+        await self.session.refresh(verified_source)
+        return verified_source
+
+    async def delete(self, source_id: UUID) -> bool:
+        """Delete a verified source by ID."""
+        verified_source = await self.get_by_id(source_id)
+        if verified_source:
+            await self.session.delete(verified_source)
+            await self.session.flush()
+            return True
+        return False
+
+    async def count(self, source_type: Optional[str] = None) -> int:
+        """
+        Count verified sources.
+
+        Args:
+            source_type: Optional filter by source type (book, paper, ancient_text)
+
+        Returns:
+            Total count of matching verified sources
+        """
+        query = select(func.count()).select_from(VerifiedSource)
+
+        if source_type:
+            query = query.where(VerifiedSource.source_type == source_type)
+
+        result = await self.session.execute(query)
+        return result.scalar_one()

@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
 
+    # Source Verification API Keys (Phase 4.1)
+    GOOGLE_BOOKS_API_KEY: Optional[str] = None
+    TAVILY_API_KEY: Optional[str] = None
+    SEMANTIC_SCHOLAR_API_KEY: Optional[str] = None
+
     # WebSocket configuration
     WS_HEARTBEAT_INTERVAL: int = 30  # seconds
 

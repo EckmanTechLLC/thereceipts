@@ -1,4 +1,7 @@
 .admin-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
   background-color: #1976d2;
   border-bottom: 1px solid #1565c0;
   padding: 0 2rem;

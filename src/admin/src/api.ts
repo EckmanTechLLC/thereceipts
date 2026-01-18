@@ -170,9 +170,29 @@ class AdminAPIClient {
     });
   }
 
-  async triggerAutoSuggest(): Promise<any> {
+  async triggerAutoSuggest(sourceText: string, sourceUrl?: string, sourceName?: string): Promise<any> {
     return this.request<any>('/api/admin/autosuggest/trigger', {
       method: 'POST',
+      body: JSON.stringify({
+        source_text: sourceText,
+        source_url: sourceUrl,
+        source_name: sourceName,
+        skip_deduplication: false,
+      }),
+    });
+  }
+
+  async discoverTopics(): Promise<any> {
+    return this.request<any>('/api/admin/autosuggest/discover', {
+      method: 'POST',
+    });
+  }
+
+  // Database management
+  async resetDatabase(confirm: boolean): Promise<any> {
+    return this.request<any>('/api/admin/database/reset', {
+      method: 'POST',
+      body: JSON.stringify({ confirm }),
     });
   }
 }

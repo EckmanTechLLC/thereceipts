@@ -7,6 +7,7 @@ Main entry point for the backend API server.
 from typing import List, Optional, Dict
 from fastapi import FastAPI, Depends, Query, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 import json
@@ -381,6 +382,11 @@ class ReviewRevisionRequest(BaseModel):
     revision_details: Optional[Dict] = None  # e.g., {"claim_card_ids": ["uuid1", "uuid2"]}
 
 
+class DatabaseResetRequest(BaseModel):
+    """Request model for database reset confirmation."""
+    confirm: bool
+
+
 async def run_pipeline_background_task(
     question: str,
     contextualized_question: str,
@@ -744,6 +750,12 @@ async def chat_ask(
                                 "citation": s.citation,
                                 "url": s.url,
                                 "quote_text": s.quote_text,
+                                "usage_context": s.usage_context,
+                                # Phase 4.1: Verification metadata
+                                "verification_method": s.verification_method,
+                                "verification_status": s.verification_status,
+                                "content_type": s.content_type,
+                                "url_verified": s.url_verified,
                             }
                             for s in claim.sources
                         ],
@@ -1277,7 +1289,7 @@ async def admin_update_autosuggest_settings(request: AutoSuggestSettingsRequest)
 
 
 @app.post("/api/admin/autosuggest/trigger")
-async def admin_trigger_autosuggest(request: AutoSuggestExtractRequest):
+async def admin_trigger_autosuggest(request: Optional[AutoSuggestExtractRequest] = None):
     """
     Manually trigger topic extraction from source text (admin only).
 
@@ -1301,6 +1313,13 @@ async def admin_trigger_autosuggest(request: AutoSuggestExtractRequest):
     Raises:
         HTTPException: If extraction fails
     """
+    # Validate request body and source_text
+    if not request or not request.source_text:
+        raise HTTPException(
+            status_code=400,
+            detail="source_text is required. This endpoint extracts topics from provided text. Use the admin UI form to paste apologetics content for analysis."
+        )
+
     try:
         # Extract topics from text
         topics = await autosuggest_service.extract_topics_from_text(
@@ -1331,6 +1350,50 @@ async def admin_trigger_autosuggest(request: AutoSuggestExtractRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Failed to run auto-suggest")
+
+
+@app.post("/api/admin/autosuggest/discover")
+async def admin_discover_topics():
+    """
+    Automatically discover topics from web sources (admin only).
+
+    Uses Tavily web search to find recent Christian apologetics content,
+    extracts factual claims using LLM, deduplicates against existing
+    claim cards, and adds novel topics to the generation queue.
+
+    No request body required - this endpoint performs automatic discovery.
+
+    Returns:
+        Discovery summary:
+            - extracted: Number of topics extracted from search results
+            - added: Number of topics added to queue
+            - skipped_duplicates: Number skipped due to existing similar claims
+            - failed: Number that failed to add
+            - sources_searched: Number of web sources searched
+
+    Raises:
+        HTTPException: If discovery fails or Tavily not configured
+    """
+    try:
+        result = await autosuggest_service.discover_topics_from_web()
+
+        return {
+            "success": True,
+            "message": f"Discovered {result['extracted']} topics from {result['sources_searched']} sources, added {result['added']} to queue",
+            "extracted": result["extracted"],
+            "added": result["added"],
+            "skipped_duplicates": result["skipped_duplicates"],
+            "failed": result["failed"],
+            "sources_searched": result["sources_searched"],
+        }
+
+    except AutoSuggestServiceError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        print(f"Error running auto-suggest discovery: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to run auto-suggest discovery")
 
 
 # Review Workflow API endpoints (Phase 3.4)
@@ -1496,6 +1559,108 @@ async def admin_request_revision(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Failed to request revision")
+
+
+@app.post("/api/admin/database/reset")
+async def admin_database_reset(
+    request: DatabaseResetRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Clear database (delete content, preserve system config) - admin only.
+
+    Deletes all generated content while preserving system configuration:
+
+    **Deleted:**
+    - All claim cards (cascades to sources, apologetics_tags, category_tags)
+    - All blog posts
+    - All topics in queue
+    - All router decisions
+
+    **Preserved:**
+    - Agent prompts (system configuration)
+    - Agent configs (LLM models, settings)
+    - Verified sources library (verified_sources table)
+
+    Args:
+        request: JSON body with "confirm": true
+        db: Database session
+
+    Returns:
+        Summary of deleted records
+
+    Raises:
+        HTTPException: If confirmation not provided or deletion fails
+    """
+    if not request.confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="Confirmation required: set 'confirm' to true"
+        )
+
+    try:
+        from database.models import (
+            ClaimCard, BlogPost, TopicQueue, RouterDecision,
+            Source, ApologeticsTag, CategoryTag
+        )
+
+        # Count records before deletion
+        claim_count_result = await db.execute(select(func.count()).select_from(ClaimCard))
+        claim_count = claim_count_result.scalar_one()
+
+        blog_count_result = await db.execute(select(func.count()).select_from(BlogPost))
+        blog_count = blog_count_result.scalar_one()
+
+        topic_count_result = await db.execute(select(func.count()).select_from(TopicQueue))
+        topic_count = topic_count_result.scalar_one()
+
+        router_count_result = await db.execute(select(func.count()).select_from(RouterDecision))
+        router_count = router_count_result.scalar_one()
+
+        # Delete in transaction (all or nothing)
+        # Order matters: delete children before parents where FK constraints exist
+
+        # 1. Delete router decisions (no dependencies)
+        await db.execute(RouterDecision.__table__.delete())
+
+        # 2. Delete blog posts (references topic_queue with SET NULL FK)
+        await db.execute(BlogPost.__table__.delete())
+
+        # 3. Delete claim card children (FK to claim_cards)
+        await db.execute(Source.__table__.delete())
+        await db.execute(ApologeticsTag.__table__.delete())
+        await db.execute(CategoryTag.__table__.delete())
+
+        # 4. Delete claim cards (now safe, all FK references removed)
+        await db.execute(ClaimCard.__table__.delete())
+
+        # 5. Delete topic queue (now safe, blog_post_id will be NULL)
+        await db.execute(TopicQueue.__table__.delete())
+
+        # Commit transaction
+        await db.commit()
+
+        return {
+            "success": True,
+            "message": "Database reset successfully",
+            "deleted": {
+                "claim_cards": claim_count,
+                "blog_posts": blog_count,
+                "topics": topic_count,
+                "router_decisions": router_count,
+            },
+            "preserved": [
+                "agent_prompts",
+                "verified_sources (library)",
+            ]
+        }
+
+    except Exception as e:
+        await db.rollback()
+        print(f"Error resetting database: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to reset database: {str(e)}")
 
 
 # ============================================================================
@@ -1748,6 +1913,259 @@ async def get_audit_card(
             for ct in claim_card.category_tags
         ],
     }
+
+
+@app.get("/api/public/sources")
+async def list_public_sources(
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(50, ge=1, le=100, description="Maximum number of records to return"),
+    verification_status: Optional[str] = Query(None, description="Filter by verification status"),
+    source_type: Optional[str] = Query(None, description="Filter by source type"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    List all sources sorted by reference count (public endpoint).
+
+    Returns sources with usage counts (number of claim cards referencing each source),
+    sorted by most referenced first.
+
+    Args:
+        skip: Offset for pagination (default: 0)
+        limit: Number of records to return (default: 50, max: 100)
+        verification_status: Optional filter by verification_status
+        source_type: Optional filter by source_type
+        db: Database session
+
+    Returns:
+        JSON with sources array and pagination info
+    """
+    try:
+        from database.models import Source
+
+        # Build query: SELECT sources.*, COUNT(DISTINCT claim_card_id) as usage_count
+        query = (
+            select(
+                Source,
+                func.count().label("usage_count")
+            )
+            .group_by(Source.id)
+            .order_by(func.count().desc(), Source.created_at.desc())
+        )
+
+        # Apply filters
+        if verification_status:
+            query = query.where(Source.verification_status == verification_status)
+        if source_type:
+            query = query.where(Source.source_type == source_type)
+
+        # Apply pagination
+        query = query.offset(skip).limit(limit)
+
+        # Execute query
+        result = await db.execute(query)
+        rows = result.all()
+
+        # Format response
+        sources = [
+            {
+                "id": str(row.Source.id),
+                "citation": row.Source.citation,
+                "source_type": row.Source.source_type.value,
+                "url": row.Source.url,
+                "verification_method": row.Source.verification_method,
+                "verification_status": row.Source.verification_status,
+                "content_type": row.Source.content_type,
+                "url_verified": row.Source.url_verified,
+                "usage_count": row.usage_count,
+                "created_at": row.Source.created_at.isoformat(),
+            }
+            for row in rows
+        ]
+
+        return {
+            "sources": sources,
+            "pagination": {
+                "skip": skip,
+                "limit": limit,
+                "count": len(sources),
+            }
+        }
+
+    except Exception as e:
+        print(f"Error fetching sources: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to fetch sources")
+
+
+@app.get("/api/public/metrics")
+async def get_public_metrics(db: AsyncSession = Depends(get_db)):
+    """
+    Get public metrics for home page.
+
+    Public endpoint - returns counts for claims, blog posts, and questions answered.
+
+    Returns:
+        JSON with:
+            - claim_count: Total number of claim cards
+            - blog_count: Total number of published blog posts
+            - question_count: Total number of questions answered (approximated by routing decisions)
+    """
+    try:
+        claim_repo = ClaimCardRepository(db)
+        blog_repo = BlogPostRepository(db)
+
+        # Get counts
+        claim_count = await claim_repo.count()
+        blog_count = await blog_repo.count(published_only=True)
+
+        # Question count: Count routing decisions as proxy for questions answered
+        from database.models import RouterDecision
+        question_result = await db.execute(
+            select(func.count()).select_from(RouterDecision)
+        )
+        question_count = question_result.scalar_one()
+
+        return {
+            "claim_count": claim_count,
+            "blog_count": blog_count,
+            "question_count": question_count,
+        }
+
+    except Exception as e:
+        print(f"Error fetching public metrics: {str(e)}")
+        # Return zeros instead of failing
+        return {
+            "claim_count": 0,
+            "blog_count": 0,
+            "question_count": 0,
+        }
+
+
+@app.get("/api/public/graph")
+async def get_knowledge_graph(db: AsyncSession = Depends(get_db)):
+    """
+    Get knowledge graph data for visualization.
+
+    Public endpoint - returns nodes (blogs, claims, sources) and edges
+    showing relationships between them.
+
+    Returns:
+        JSON with:
+            - nodes: Array of {id, label, type, metadata}
+            - edges: Array of {id, source, target, type}
+    """
+    try:
+        from database.models import BlogPost, ClaimCard, Source
+
+        # Get published blog posts
+        blog_repo = BlogPostRepository(db)
+        blogs = await blog_repo.get_all(skip=0, limit=100, published_only=True)
+
+        print(f"[GRAPH DEBUG] Found {len(blogs)} published blogs")
+
+        # Get all claim cards referenced by blogs
+        all_claim_ids = set()
+        for blog in blogs:
+            print(f"[GRAPH DEBUG] Blog '{blog.title}' has {len(blog.claim_card_ids)} claims: {blog.claim_card_ids}")
+            all_claim_ids.update(blog.claim_card_ids)
+
+        print(f"[GRAPH DEBUG] Total unique claim IDs: {len(all_claim_ids)}")
+
+        # Fetch claim cards
+        claim_repo = ClaimCardRepository(db)
+        claims_dict = {}
+        for claim_id in all_claim_ids:
+            # Convert to UUID if it's a string
+            from uuid import UUID as UUIDType
+            if isinstance(claim_id, str):
+                claim_id_obj = UUIDType(claim_id)
+            else:
+                claim_id_obj = claim_id
+
+            claim = await claim_repo.get_by_id(claim_id_obj)
+            if claim:
+                claims_dict[str(claim_id_obj)] = claim
+            else:
+                print(f"[GRAPH DEBUG] Claim not found: {claim_id_obj}")
+
+        print(f"[GRAPH DEBUG] Successfully fetched {len(claims_dict)} claims")
+
+        # Build nodes and edges
+        nodes = []
+        edges = []
+
+        # Add blog nodes
+        for blog in blogs:
+            nodes.append({
+                "id": f"blog-{blog.id}",
+                "label": blog.title[:50] + "..." if len(blog.title) > 50 else blog.title,
+                "type": "blog",
+                "metadata": {
+                    "title": blog.title,
+                    "published_at": blog.published_at.isoformat() if blog.published_at else None,
+                }
+            })
+
+            # Add edges from blog to claims
+            for claim_id in blog.claim_card_ids:
+                if str(claim_id) in claims_dict:
+                    edges.append({
+                        "id": f"blog-{blog.id}-claim-{claim_id}",
+                        "source": f"blog-{blog.id}",
+                        "target": f"claim-{claim_id}",
+                        "type": "HAS_CLAIM"
+                    })
+
+        # Add claim nodes and edges to sources
+        for claim_id_str, claim in claims_dict.items():
+            nodes.append({
+                "id": f"claim-{claim.id}",
+                "label": claim.claim_text[:50] + "..." if len(claim.claim_text) > 50 else claim.claim_text,
+                "type": "claim",
+                "metadata": {
+                    "claim_text": claim.claim_text,
+                    "verdict": claim.verdict.value,
+                }
+            })
+
+            # Add source nodes and edges
+            for source in claim.sources:
+                source_id = f"source-{source.id}"
+
+                # Add source node if not already added
+                if not any(n["id"] == source_id for n in nodes):
+                    nodes.append({
+                        "id": source_id,
+                        "label": source.citation[:50] + "..." if len(source.citation) > 50 else source.citation,
+                        "type": "source",
+                        "metadata": {
+                            "citation": source.citation,
+                            "source_type": source.source_type.value,
+                            "url": source.url,
+                        }
+                    })
+
+                # Add edge from claim to source
+                edges.append({
+                    "id": f"claim-{claim.id}-source-{source.id}",
+                    "source": f"claim-{claim.id}",
+                    "target": source_id,
+                    "type": "USES_SOURCE"
+                })
+
+        print(f"[GRAPH DEBUG] Returning {len(nodes)} nodes and {len(edges)} edges")
+
+        return {
+            "nodes": nodes,
+            "edges": edges
+        }
+
+    except Exception as e:
+        print(f"Error fetching knowledge graph: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Failed to fetch knowledge graph")
 
 
 # ============================================================================
