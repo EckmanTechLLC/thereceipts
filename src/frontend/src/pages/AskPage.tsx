@@ -140,7 +140,9 @@ export function AskPage() {
           setAgentProgress(AGENT_ORDER.map(name => ({ agentName: name, status: 'pending' })));
 
           // Connect to WebSocket
-          const ws = new WebSocket(`ws://${window.location.hostname}:8008/ws/pipeline/${novelClaim.websocket_session_id}`);
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const host = import.meta.env.VITE_WS_URL || window.location.host;
+          const ws = new WebSocket(`${protocol}//${host}/ws/pipeline/${novelClaim.websocket_session_id}`);
 
           ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
