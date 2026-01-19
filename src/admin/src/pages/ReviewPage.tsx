@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import type { PendingReview, ClaimCard } from '../types';
+import type { PendingReview } from '../types';
 import './ReviewPage.css';
 
 export function ReviewPage() {
