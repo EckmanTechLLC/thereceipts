@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactFlow, {
   Node,
@@ -61,7 +61,7 @@ function convertToReactFlowNodes(graphNodes: GraphNode[]): Node[] {
         x: col * horizontalSpacing,
         y: row * verticalSpacing,
       },
-      data: { label: node.label, ...node },
+      data: node,
       style: createNodeStyle(node.type),
     });
   });
@@ -81,7 +81,7 @@ function convertToReactFlowNodes(graphNodes: GraphNode[]): Node[] {
         x: col * horizontalSpacing,
         y: claimStartY + row * verticalSpacing,
       },
-      data: { label: node.label, ...node },
+      data: node,
       style: createNodeStyle(node.type),
     });
   });
@@ -101,7 +101,7 @@ function convertToReactFlowNodes(graphNodes: GraphNode[]): Node[] {
         x: col * horizontalSpacing,
         y: sourceStartY + row * verticalSpacing,
       },
-      data: { label: node.label, ...node },
+      data: node,
       style: createNodeStyle(node.type),
     });
   });

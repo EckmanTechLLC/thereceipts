@@ -16,7 +16,7 @@ export type ProgressEventHandler = (event: ProgressEvent) => void;
 
 export class PipelineWebSocketClient {
   private ws: WebSocket | null = null;
-  private sessionId: string;
+  private _sessionId: string;
   private url: string;
   private eventHandlers: ProgressEventHandler[] = [];
   private reconnectAttempts = 0;
@@ -26,7 +26,7 @@ export class PipelineWebSocketClient {
   private pingInterval: number | null = null;
 
   constructor(sessionId: string) {
-    this.sessionId = sessionId;
+    this._sessionId = sessionId;
     // Determine WebSocket URL based on current environment
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = import.meta.env.VITE_WS_URL || window.location.host;
